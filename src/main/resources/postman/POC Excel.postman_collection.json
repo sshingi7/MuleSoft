@@ -1,0 +1,29 @@
+{
+	"info": {
+		"_postman_id": "29ce5c4b-a522-4a56-b8be-755e82218ae7",
+		"name": "POC Excel",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "22807705"
+	},
+	"item": [
+		{
+			"name": "Excel to JSON",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8081/excel2json",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8081",
+					"path": [
+						"excel2json"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
