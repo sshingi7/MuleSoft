@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ftp="http://www.mulesoft.org/schema/mule/ftp" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ftp http://www.mulesoft.org/schema/mule/ftp/current/mule-ftp.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="a3d6bd9a-ce6c-4af0-925d-5e07bdec1827" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="e10afef8-7f01-4540-9f4c-325db4f2837a" >
+		<file:connection workingDir="C:" />
+	</file:config>
+	<flow name="excel-to-json-main" doc:id="afa7d6d8-fb55-4343-9c78-4293040fc7e0" >
+		<http:listener doc:name="Listener" doc:id="07e432e8-c985-4e92-8c51-47c880f3ba01" config-ref="HTTP_Listener_config" path="/excel2json"/>
+		<logger level="INFO" doc:name="Start Logger" doc:id="95c9abe7-16c1-447b-8acb-cdfe870425fd" message="Start Logger" />
+		<file:read doc:name="Read excel file" doc:id="0e5ca2c3-66e7-433d-bdf3-f5ac6ba07f9f" config-ref="File_Config" path="\Excel\Input\sample-excel-file.xlsx" outputMimeType="application/xlsx"/>
+		<ee:transform doc:name="Transform Excel to Json" doc:id="0add62ab-373c-456a-bf19-41464bf691db" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger: Excel To Json" doc:id="3abeed0f-3c78-4169-a16b-dbe46de5598a" message="#[payload]"/>
+		<flow-ref doc:name="convert-excel-to-xml-using-java-to-extract-hyperlink-sub-flow" doc:id="053f09d0-c95a-4763-88be-4812722916c4" name="convert-excel-to-xml-using-java-to-extract-hyperlink-sub-flow" target="success"/>
+		<flow-ref doc:name="convert-xml-to-json-to-extract-hyperlink-sub-flow" doc:id="90254cda-3c7c-4d4c-bc28-e2aa8faccb02" name="convert-xml-to-json-to-extract-hyperlink-sub-flow" target="hyperlinks"/>
+		<ee:transform doc:name="Final Transform Payload" doc:id="6cd70ecf-9995-44cd-86f2-a6b26a8ecf25" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"File name": attributes.fileName,
+	"File path": attributes.path,
+	"Data": payload.Sheet1 map {
+	    "Name": $.Name,
+	    "Role": $.Role,
+	    "Website": $.Website ++ " - " ++ vars.hyperlinks[$$]
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger: Final Response" doc:id="7dc400c5-b13c-4d14-96f9-4d496327e7f0" message="#[payload]"/>
+		<logger level="INFO" doc:name="End Logger" doc:id="89a3eb7d-b2f8-4fcf-bfd6-f2a98b6d252b" message="End Logger"/>
+	</flow>
+	<sub-flow name="convert-excel-to-xml-using-java-to-extract-hyperlink-sub-flow" doc:id="f8da99f9-934e-4f2a-8b1a-2433232d040c">
+		<ee:transform doc:name="Convert to XML using Java" doc:id="0a271b06-d28c-4c0c-86e5-6e7daea51c37">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+import java!com::utils::UniqueUtils
+output application/json
+---
+{
+	xmlfile: UniqueUtils::getXMLFile()
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger - Success" doc:id="18b7c824-d706-45ad-bc69-8fbae1c0473e" message="#[payload]"/>
+	</sub-flow>
+	<sub-flow name="convert-xml-to-json-to-extract-hyperlink-sub-flow" doc:id="11ca9403-3926-40fd-9c8b-f5ab90ea9914" >
+		<file:read doc:name="Read XML file" doc:id="7f4e36c4-6f8f-459b-a9fa-57e4d306ac34" config-ref="File_Config" path="\Excel\Output\xmlFile.xml" outputMimeType="application/xml"/>
+		<ee:transform doc:name="Tranform XML to JSON" doc:id="ae299318-ca3d-4209-9cdd-1a521ff0bb91" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload.package.*part[?($.@name=="/xl/worksheets/sheet1.xml")]).xmlData.worksheet.hyperlinks.*hyperlink map ($.@display)
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger - Hyperlinks" doc:id="9d2b616a-b7a8-4ce8-b92b-89d94348b53e" message="#[payload]"/>
+	</sub-flow>
+</mule>
